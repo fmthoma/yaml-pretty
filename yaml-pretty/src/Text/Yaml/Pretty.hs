@@ -2,14 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Text.Yaml.Pretty where
 
-import           Data.Bool                 (bool)
-import qualified Data.HashMap.Lazy         as Map
-import           Data.List                 (intersperse)
-import           Data.Scientific           (Scientific)
-import           Data.Text                 (Text)
-import qualified Data.Text                 as Text
-import           Data.Text.Prettyprint.Doc hiding (encloseSep)
-import qualified Data.Vector               as Vector
+import           Data.Bool                      (bool)
+import qualified Data.HashMap.Lazy              as Map
+import           Data.List                      (intersperse)
+import           Data.Scientific                (Scientific)
+import           Data.Text                      (Text)
+import qualified Data.Text                      as Text
+import           Data.Text.Prettyprint.Doc      hiding (encloseSep)
+import           Data.Text.Prettyprint.Doc.Util (reflow)
+import qualified Data.Vector                    as Vector
 import           Data.Yaml
 
 prettyYaml :: ToJSON a => a -> Doc ()
@@ -50,11 +51,16 @@ prettyArray = render . Vector.toList
 
 prettyString :: Text -> Doc a
 prettyString s
-    | Text.any (== ':') s  = "\"" <> pretty s <> "\""
-    | otherwise            = softQuote <> float s <> softQuote
+    | Text.null s      = "\"\""
+    | mustBeEscaped s  = "\"" <> pretty s <> "\""
+    | otherwise        = softQuote <> reflow s <> softQuote
   where
     softQuote = flatAlt "\"" ""
-    float = fillSep . fmap pretty . Text.words
+    mustBeEscaped s =
+        Text.any (`elem` ("{}[]:" :: [Char])) s
+        || Text.head s == ' '
+        || Text.last s == ' '
+        
 
 prettyNumber :: Scientific -> Doc a
 prettyNumber = undefined

@@ -3,6 +3,7 @@
 module Text.Yaml.Pretty where
 
 import           Data.Bool                      (bool)
+import           Data.Char
 import qualified Data.HashMap.Lazy              as Map
 import           Data.List                      (intersperse)
 import           Data.Scientific                (Scientific)
@@ -51,16 +52,33 @@ prettyArray = render . Vector.toList
 
 prettyString :: Text -> Doc a
 prettyString s
-    | Text.null s      = "\"\""
-    | mustBeEscaped s  = "\"" <> pretty s <> "\""
-    | otherwise        = softQuote <> reflow s <> softQuote
+    | Text.null s           = "\"\""
+    | mustBeSingleQuoted s  = "! '" <> pretty (Text.replace "'" "''" s) <> "'"
+    | mustBeDoubleQuoted s  = "\"" <> reflow s <> "\""
+    | otherwise             = softQuote <> reflow s <> softQuote
   where
     softQuote = flatAlt "\"" ""
-    mustBeEscaped s =
-        Text.any (`elem` ("{}[]:" :: [Char])) s
-        || Text.head s == ' '
-        || Text.last s == ' '
-        
+    mustBeSingleQuoted s =
+        Text.any (`elem` ("\\?\"," :: [Char])) s
+        || Text.head s `elem` ("|!~+*@-'%&>`" :: [Char])
+        || isNumber (Text.head s)
+        || isSpace (Text.head s)
+        || isSpace (Text.last s)
+    mustBeDoubleQuoted s =
+        Text.any (`elem` ("{}[]():#" :: [Char])) s
+        || s `elem` [ "y", "Y", "yes", "Yes", "YES"
+                    , "n", "N", "no", "No", "NO"
+                    , "true", "True", "TRUE"
+                    , "false", "False", "FALSE"
+                    , "on", "On", "ON"
+                    , "off", "Off", "OFF" ]
+    reflow :: Text -> Doc a
+    reflow t = case Text.break (== ' ') t of
+        (word, t') -> case Text.span (== ' ') t' of
+            (spaces, t'')
+                | Text.null t             -> mempty
+                | Text.length spaces == 1 -> pretty word <> softline      <> reflow t''
+                | otherwise               -> pretty word <> pretty spaces <> reflow t''
 
 prettyNumber :: Scientific -> Doc a
 prettyNumber = undefined

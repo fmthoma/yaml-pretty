@@ -14,10 +14,15 @@ import           Test.QuickCheck.Arbitrary
 import           Text.Yaml.Pretty
 
 main :: IO ()
-main = quickCheckWith stdArgs { maxSuccess = 100000 } $ forAll (choose (10,100)) $ \width ->
-    forAll arbitraryYaml $ \yaml ->
+main = do
     -- forAll (fmap String arbitraryString) $ \yaml ->
-        test yaml width
+  quickCheckWith stdArgs { maxSuccess = 100000 } $
+      forAll arbitraryString $ \yamlString ->
+      test (String yamlString) (Text.length yamlString * 2)
+  quickCheckWith stdArgs { maxSuccess = 100000 } $
+      forAll (choose (10,100)) $ \width ->
+      forAll arbitraryYaml $ \yaml ->
+      test yaml width
 
 test :: Value -> Int -> Property
 test yaml width = counterexample

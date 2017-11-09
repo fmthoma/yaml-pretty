@@ -53,25 +53,25 @@ prettyArray = render . Vector.toList
 prettyString :: Text -> Doc a
 prettyString s
     | Text.null s           = "\"\""
-    | mustBeSingleQuoted s  = "! '" <> pretty (Text.replace "'" "''" s) <> "'"
-    | mustBeDoubleQuoted s  = "\"" <> reflow s <> "\""
+    | mustBeTagged s        = "! '" <> pretty (Text.replace "'" "''" s) <> "'"
+    | mustBeQuoted s        = "'" <> pretty (Text.replace "'" "''" s) <> "'"
     | otherwise             = softQuote <> reflow s <> softQuote
   where
-    softQuote = flatAlt "\"" ""
-    mustBeSingleQuoted s =
-        Text.any (`elem` ("\\?\"," :: [Char])) s
-        || Text.head s `elem` ("|!~+*@-'%&>`" :: [Char])
-        || isNumber (Text.head s)
+    softQuote = flatAlt "" "\""
+    mustBeTagged s = Text.head s `elem` ("" :: [Char])
+    mustBeQuoted s = Text.head s `elem` ("!&?%@`'\",|\\+*-~[]{}>" :: [Char])
+        || Text.any (`elem` (":#" :: [Char])) s
         || isSpace (Text.head s)
         || isSpace (Text.last s)
-    mustBeDoubleQuoted s =
-        Text.any (`elem` ("{}[]():#" :: [Char])) s
-        || s `elem` [ "y", "Y", "yes", "Yes", "YES"
-                    , "n", "N", "no", "No", "NO"
-                    , "true", "True", "TRUE"
-                    , "false", "False", "FALSE"
-                    , "on", "On", "ON"
-                    , "off", "Off", "OFF" ]
+        || isBooleanish s
+        || Text.all (\c -> isNumber c || c == '.' || c == 'e') s
+    isBooleanish s = s `elem`
+        [ "y", "Y", "yes", "Yes", "YES"
+        , "n", "N", "no", "No", "NO"
+        , "true", "True", "TRUE"
+        , "false", "False", "FALSE"
+        , "on", "On", "ON"
+        , "off", "Off", "OFF" ]
     reflow :: Text -> Doc a
     reflow t = case Text.break (== ' ') t of
         (word, t') -> case Text.span (== ' ') t' of

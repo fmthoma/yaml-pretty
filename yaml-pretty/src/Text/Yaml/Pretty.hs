@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Text.Yaml.Pretty
     ( prettyYaml
+    , Tag (..)
     ) where
 
 import           Data.Bool                      (bool)

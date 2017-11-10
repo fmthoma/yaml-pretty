@@ -25,6 +25,7 @@ executable yq
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , prettyprinter
+                     , prettyprinter-ansi-terminal
                      , text
                      , yaml
                      , yaml-pretty

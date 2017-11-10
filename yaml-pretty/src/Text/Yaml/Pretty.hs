@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Text.Yaml.Pretty where
+module Text.Yaml.Pretty
+    ( prettyYaml
+    ) where
 
 import           Data.Bool                      (bool)
 import           Data.Char

@@ -54,17 +54,18 @@ prettyString :: Text -> Doc a
 prettyString s
     | Text.null s           = "\"\""
     | mustBeTagged s        = "! '" <> pretty (Text.replace "'" "''" s) <> "'"
-    | mustBeQuoted s        = "'" <> pretty (Text.replace "'" "''" s) <> "'"
-    | otherwise             = softQuote <> reflow s <> softQuote
+    | mustBeQuoted s        = "\"" <> pretty (escape s) <> "\""
+    | otherwise             = flatAlt ("\"" <> reflow (escape s) <> "\"") (pretty s)
   where
-    softQuote = flatAlt "" "\""
+    softQuote = flatAlt "\"" ""
     mustBeTagged s = Text.head s `elem` ("" :: [Char])
     mustBeQuoted s = Text.head s `elem` ("!&?%@`'\",|\\+*-~[]{}>" :: [Char])
         || Text.any (`elem` (":#" :: [Char])) s
         || isSpace (Text.head s)
         || isSpace (Text.last s)
         || isBooleanish s
-        || Text.all (\c -> isNumber c || c == '.' || c == 'e') s
+        || isNumerical s
+    isNumerical = Text.all (\c -> isNumber c || c == '.' || c == 'e' || c == 'E')
     isBooleanish s = s `elem`
         [ "y", "Y", "yes", "Yes", "YES"
         , "n", "N", "no", "No", "NO"
@@ -72,6 +73,8 @@ prettyString s
         , "false", "False", "FALSE"
         , "on", "On", "ON"
         , "off", "Off", "OFF" ]
+    escape = Text.replace "\"" "\\\""
+           . Text.replace "\\" "\\\\"
     reflow :: Text -> Doc a
     reflow t = case Text.break (== ' ') t of
         (word, t') -> case Text.span (== ' ') t' of

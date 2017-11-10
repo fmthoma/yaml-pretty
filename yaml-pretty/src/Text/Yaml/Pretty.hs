@@ -6,7 +6,8 @@ import           Data.Bool                      (bool)
 import           Data.Char
 import qualified Data.HashMap.Lazy              as Map
 import           Data.List                      (intersperse)
-import           Data.Scientific                (Scientific)
+import           Data.Scientific                (FPFormat (..), Scientific,
+                                                 formatScientific)
 import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
 import           Data.Text.Prettyprint.Doc      hiding (encloseSep)
@@ -98,7 +99,7 @@ isBooleanish s = s `elem`
     , "off", "Off", "OFF" ]
 
 prettyNumber :: Layout -> Scientific -> Doc a
-prettyNumber = undefined
+prettyNumber _ = pretty . formatScientific Generic Nothing
 
 encloseSep :: Doc a -> Doc a -> Doc a -> [Doc a] -> Doc a
 encloseSep left right sep docs = left <> mconcat (intersperse (line' <> sep) docs) <> right

@@ -34,6 +34,7 @@ test-suite yaml-pretty-test
                      , bytestring
                      , prettyprinter
                      , QuickCheck
+                     , scientific
                      , text
                      , unordered-containers
                      , vector

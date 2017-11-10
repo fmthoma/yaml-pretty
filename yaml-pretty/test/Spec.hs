@@ -1,7 +1,9 @@
+import           Control.Applicative                   (liftA2)
 import qualified Data.ByteString.Char8                 as BS
 import           Data.Char                             (isPrint)
 import           Data.HashMap.Lazy                     (HashMap)
 import qualified Data.HashMap.Lazy                     as Map
+import           Data.Scientific
 import           Data.Text                             (Text)
 import qualified Data.Text                             as Text
 import           Data.Text.Encoding                    (decodeUtf8, encodeUtf8)
@@ -43,6 +45,7 @@ test yaml width = counterexample
 arbitraryYaml :: Gen Value
 arbitraryYaml = sized $ \size -> frequency
     [ (3 * size, fmap String arbitraryString)
+    , (size,     fmap Number arbitraryNumber)
     , (1,        fmap Array  arbitraryArray)
     , (1,        fmap Object arbitraryObject) ]
 
@@ -50,6 +53,9 @@ arbitraryString :: Gen Text
 arbitraryString = fmap Text.pack $ listOf $ frequency
     [ (9, choose ('\0', '\127') `suchThat` isPrint)
     , (1,   arbitrary `suchThat` isPrint) ]
+
+arbitraryNumber :: Gen Scientific
+arbitraryNumber = liftA2 scientific arbitrary arbitrary
 
 arbitraryArray :: Gen (Vector Value)
 arbitraryArray = fmap Vector.fromList (listOf arbitraryYaml)

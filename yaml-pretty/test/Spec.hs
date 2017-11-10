@@ -1,13 +1,16 @@
-import qualified Data.ByteString.Char8                   as BS
-import           Data.Char                               (isPrint)
-import           Data.Text                               (Text)
-import qualified Data.Text                               as Text
+import qualified Data.ByteString.Char8                 as BS
+import           Data.Char                             (isPrint)
+import           Data.HashMap.Lazy                     (HashMap)
+import qualified Data.HashMap.Lazy                     as Map
+import           Data.Text                             (Text)
+import qualified Data.Text                             as Text
+import           Data.Text.Encoding                    (decodeUtf8, encodeUtf8)
 import           Data.Text.Prettyprint.Doc
-import           Data.Text.Prettyprint.Doc.Render.String
-import           Data.Vector                             (Vector)
-import qualified Data.Vector                             as Vector
-import           Data.Yaml                               (Value (..),
-                                                          decodeEither, encode)
+import           Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
+import           Data.Vector                           (Vector)
+import qualified Data.Vector                           as Vector
+import           Data.Yaml                             (Value (..),
+                                                        decodeEither, encode)
 import           Test.QuickCheck
 import           Test.QuickCheck.Arbitrary
 
@@ -15,7 +18,6 @@ import           Text.Yaml.Pretty
 
 main :: IO ()
 main = do
-    -- forAll (fmap String arbitraryString) $ \yaml ->
   quickCheckWith stdArgs { maxSuccess = 100000 } $
       forAll arbitraryString $ \yamlString ->
       test (String yamlString) (Text.length yamlString * 2)
@@ -28,23 +30,32 @@ test :: Value -> Int -> Property
 test yaml width = counterexample
     ( unlines
         [ "Expected:"
-        , BS.unpack (encode yaml)
+        , Text.unpack (decodeUtf8 (encode yaml))
         , ""
         , "Actual:"
-        , BS.unpack (renderPretty width yaml)
-        , either id (BS.unpack . encode) actual ] )
+        , Text.unpack (renderPretty width yaml)
+        , either id (Text.unpack . decodeUtf8 . encode) actual ] )
     (actual == decodeEither (encode yaml))
   where
-    renderPretty w = BS.pack . renderString . layoutPretty LayoutOptions { layoutPageWidth = AvailablePerLine w 1 } . prettyYaml
-    actual = decodeEither (renderPretty width yaml) :: Either String Value
+    renderPretty w = renderStrict . layoutPretty LayoutOptions { layoutPageWidth = AvailablePerLine w 1 } . prettyYaml
+    actual = decodeEither (encodeUtf8 (renderPretty width yaml)) :: Either String Value
 
 arbitraryYaml :: Gen Value
 arbitraryYaml = sized $ \size -> frequency
-    [ (size, fmap String arbitraryString)
-    , (1,    fmap Array  arbitraryArray) ]
+    [ (3 * size, fmap String arbitraryString)
+    , (1,        fmap Array  arbitraryArray)
+    , (1,        fmap Object arbitraryObject) ]
 
 arbitraryString :: Gen Text
-arbitraryString = fmap Text.pack (listOf (choose ('\0', '\127') `suchThat` isPrint))
+arbitraryString = fmap Text.pack $ listOf $ frequency
+    [ (9, choose ('\0', '\127') `suchThat` isPrint)
+    , (1,   arbitrary `suchThat` isPrint) ]
 
 arbitraryArray :: Gen (Vector Value)
 arbitraryArray = fmap Vector.fromList (listOf arbitraryYaml)
+
+arbitraryObject :: Gen (HashMap Text Value)
+arbitraryObject = fmap Map.fromList $ listOf $ do
+    key <- arbitraryString
+    value <- arbitraryYaml
+    pure (key, value)

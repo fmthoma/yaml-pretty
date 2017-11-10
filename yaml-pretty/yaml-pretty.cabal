@@ -35,6 +35,7 @@ test-suite yaml-pretty-test
                      , prettyprinter
                      , QuickCheck
                      , text
+                     , unordered-containers
                      , vector
                      , yaml
                      , yaml-pretty

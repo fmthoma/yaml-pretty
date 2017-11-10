@@ -37,7 +37,11 @@ prettyObject layout = render . Map.toList
         | otherwise         = flatAlt (multiLineObject kvps) (oneLineObject kvps)
     oneLineObject kvps = "{" <+> mconcat (intersperse ", " (fmap (renderKeyValuePair OneLine) kvps)) <+> "}"
     multiLineObject kvps = mconcat (intersperse hardline (fmap (group . renderKeyValuePair MultiLine) kvps))
-    renderKeyValuePair l (k, v) = pretty k <> ":" <+> nest 2 (flatAlt line "" <> prettyValue l v)
+    renderKeyValuePair l (k, v) = renderKey k <> ":" <+> nest 2 (flatAlt line "" <> prettyValue l v)
+    renderKey k
+        | Text.null k        = "\"\""
+        | mustBeQuotedKey k  = "\"" <> pretty (escape k) <> "\""
+        | otherwise          = pretty k
 
 prettyArray :: Layout -> Array -> Doc a
 prettyArray layout = render . Vector.toList
@@ -60,23 +64,6 @@ prettyString layout s
                                       (pretty s)
   where
     softQuote = flatAlt "\"" ""
-    mustBeTagged s = Text.head s `elem` ("" :: [Char])
-    mustBeQuoted s = Text.head s `elem` ("!&?%@`'\",|\\+*-~[]{}>" :: [Char])
-        || Text.any (`elem` (":#" :: [Char])) s
-        || isSpace (Text.head s)
-        || isSpace (Text.last s)
-        || isBooleanish s
-        || isNumerical s
-    isNumerical = Text.all (\c -> isNumber c || c == '.' || c == 'e' || c == 'E')
-    isBooleanish s = s `elem`
-        [ "y", "Y", "yes", "Yes", "YES"
-        , "n", "N", "no", "No", "NO"
-        , "true", "True", "TRUE"
-        , "false", "False", "FALSE"
-        , "on", "On", "ON"
-        , "off", "Off", "OFF" ]
-    escape = Text.replace "\"" "\\\""
-           . Text.replace "\\" "\\\\"
     reflow :: Text -> Doc a
     reflow t = case Text.break (== ' ') t of
         (word, t') -> case Text.span (== ' ') t' of
@@ -84,6 +71,31 @@ prettyString layout s
                 | Text.null t             -> mempty
                 | Text.length spaces == 1 -> pretty word <> softline      <> reflow t''
                 | otherwise               -> pretty word <> pretty spaces <> reflow t''
+
+escape = Text.replace "\"" "\\\""
+        . Text.replace "\\" "\\\\"
+
+mustBeTagged s = Text.head s `elem` ("" :: [Char])
+
+mustBeQuoted s = Text.head s `elem` ("!&?%@`'\",|\\+*-~[]{}>" :: [Char])
+    || Text.any (`elem` (":#" :: [Char])) s
+    || isSpace (Text.head s)
+    || isSpace (Text.last s)
+    || isBooleanish s
+    || isNumerical s
+
+mustBeQuotedKey s = mustBeQuoted s
+    || Text.any (`elem` ("?,{}[]" :: [Char])) s
+
+isNumerical = Text.all (\c -> isNumber c || c == '.' || c == 'e' || c == 'E')
+
+isBooleanish s = s `elem`
+    [ "y", "Y", "yes", "Yes", "YES"
+    , "n", "N", "no", "No", "NO"
+    , "true", "True", "TRUE"
+    , "false", "False", "FALSE"
+    , "on", "On", "ON"
+    , "off", "Off", "OFF" ]
 
 prettyNumber :: Layout -> Scientific -> Doc a
 prettyNumber = undefined

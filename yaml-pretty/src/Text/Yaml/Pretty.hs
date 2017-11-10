@@ -17,57 +17,56 @@ import           Data.Text.Prettyprint.Doc.Util (reflow)
 import qualified Data.Vector                    as Vector
 import           Data.Yaml
 
-prettyYaml :: ToJSON a => a -> Doc ()
+prettyYaml :: ToJSON a => a -> Doc Tag
 prettyYaml = prettyValue MultiLine. toJSON
 
 data Layout = OneLine | MultiLine
+data Tag = Key | StringV | NumberV | BoolV | NullV | Syntax
 
-prettyValue :: Layout -> Value -> Doc a
+prettyValue :: Layout -> Value -> Doc Tag
 prettyValue layout = \case
   Object o -> prettyObject layout o
   Array a  -> prettyArray layout a
   String s -> prettyString layout s
   Number n -> prettyNumber layout n
-  Bool b   -> bool "false" "true" b
-  Null     -> "null"
+  Bool b   -> annotate BoolV (bool "false" "true" b)
+  Null     -> annotate NullV "null"
 
-prettyObject :: Layout -> Object -> Doc a
+prettyObject :: Layout -> Object -> Doc Tag
 prettyObject layout = render . Map.toList
   where
     render kvps
-        | null kvps         = "{}"
+        | null kvps         = syntax "{}"
         | OneLine <- layout = oneLineObject kvps
         | otherwise         = flatAlt (multiLineObject kvps) (oneLineObject kvps)
-    oneLineObject kvps = "{" <+> mconcat (intersperse ", " (fmap (renderKeyValuePair OneLine) kvps)) <+> "}"
-    multiLineObject kvps = mconcat (intersperse hardline (fmap (group . renderKeyValuePair MultiLine) kvps))
-    renderKeyValuePair l (k, v) = renderKey k <> ":" <+> nest 2 (flatAlt line "" <> prettyValue l v)
+    oneLineObject kvps = curlyBraces (commaSep (fmap (renderKeyValuePair OneLine) kvps))
+    multiLineObject kvps = lineSep (fmap (group . renderKeyValuePair MultiLine) kvps)
+    renderKeyValuePair l (k, v) = renderKey k <> syntax ":" <+> nest 2 (line <> prettyValue l v)
     renderKey k
-        | Text.null k        = "\"\""
-        | mustBeQuotedKey k  = "\"" <> pretty (escape k) <> "\""
-        | otherwise          = pretty k
+        | Text.null k        = quoted mempty
+        | mustBeQuotedKey k  = quoted (key (escape k))
+        | otherwise          = key k
 
-prettyArray :: Layout -> Array -> Doc a
+prettyArray :: Layout -> Array -> Doc Tag
 prettyArray layout = render . Vector.toList
   where
     render vs
-        | null vs           = "[]"
+        | null vs           = syntax "[]"
         | OneLine <- layout = oneLineArray vs
         | otherwise         = flatAlt (multiLineArray vs) (oneLineArray vs)
-    oneLineArray vs = "[" <+> mconcat (intersperse ", " (fmap (prettyValue OneLine) vs)) <+> "]"
-    multiLineArray vs = "-" <+> mconcat (intersperse (hardline <> "- ") (fmap (group . nest 2 . prettyValue MultiLine) vs))
+    oneLineArray vs = squareBrackets (commaSep (fmap (prettyValue OneLine) vs))
+    multiLineArray vs = lineSep (fmap ((syntax "-" <+>) . group . nest 2 . prettyValue MultiLine) vs)
 
 
-prettyString :: Layout -> Text -> Doc a
+prettyString :: Layout -> Text -> Doc Tag
 prettyString layout s
-    | Text.null s           = "\"\""
-    | mustBeTagged s        = "! '" <> pretty (Text.replace "'" "''" s) <> "'"
-    | OneLine <- layout     = "\"" <> pretty (escape s) <> "\""
-    | mustBeQuoted s        = "\"" <> reflow (escape s) <> "\""
-    | otherwise             = flatAlt ("\"" <> reflow (escape s) <> "\"")
-                                      (pretty s)
+    | Text.null s           = quoted mempty
+    | OneLine <- layout     = quoted (stringV (escape s))
+    | mustBeQuoted s        = quoted (annotate StringV (reflow (escape s)))
+    | otherwise             = flatAlt (quoted (annotate StringV (reflow (escape s))))
+                                      (stringV s)
   where
-    softQuote = flatAlt "\"" ""
-    reflow :: Text -> Doc a
+    reflow :: Text -> Doc Tag
     reflow t = case Text.break (== ' ') t of
         (word, t') -> case Text.span (== ' ') t' of
             (spaces, t'')
@@ -77,8 +76,6 @@ prettyString layout s
 
 escape = Text.replace "\"" "\\\""
         . Text.replace "\\" "\\\\"
-
-mustBeTagged s = Text.head s `elem` ("" :: [Char])
 
 mustBeQuoted s = Text.head s `elem` ("!&?%@`'\",|\\+*-~[]{}>" :: [Char])
     || Text.any (`elem` (":#" :: [Char])) s
@@ -100,8 +97,32 @@ isBooleanish s = s `elem`
     , "on", "On", "ON"
     , "off", "Off", "OFF" ]
 
-prettyNumber :: Layout -> Scientific -> Doc a
-prettyNumber _ = pretty . formatScientific Generic Nothing
+prettyNumber :: Layout -> Scientific -> Doc Tag
+prettyNumber _ = annotate NumberV . pretty . formatScientific Generic Nothing
 
-encloseSep :: Doc a -> Doc a -> Doc a -> [Doc a] -> Doc a
+encloseSep :: Doc Tag -> Doc Tag -> Doc Tag -> [Doc Tag] -> Doc Tag
 encloseSep left right sep docs = left <> mconcat (intersperse (line' <> sep) docs) <> right
+
+quoted :: Doc Tag -> Doc Tag
+quoted doc = syntax "\"" <> doc <> syntax "\""
+
+curlyBraces :: Doc Tag -> Doc Tag
+curlyBraces doc = syntax "{" <+> doc <+> syntax "}"
+
+squareBrackets :: Doc Tag -> Doc Tag
+squareBrackets doc = syntax "[" <+> doc <+> syntax "]"
+
+commaSep :: [Doc Tag] -> Doc Tag
+commaSep = mconcat . intersperse (syntax ", ")
+
+lineSep :: [Doc Tag] -> Doc Tag
+lineSep = mconcat . intersperse hardline
+
+syntax :: Text -> Doc Tag
+syntax = annotate Syntax . pretty
+
+key :: Text -> Doc Tag
+key = annotate Key . pretty
+
+stringV :: Text -> Doc Tag
+stringV = annotate StringV . pretty

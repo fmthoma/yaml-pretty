@@ -15,47 +15,49 @@ import qualified Data.Vector                    as Vector
 import           Data.Yaml
 
 prettyYaml :: ToJSON a => a -> Doc ()
-prettyYaml = prettyValue . toJSON
+prettyYaml = prettyValue MultiLine. toJSON
 
-prettyValue :: Value -> Doc a
-prettyValue = \case
-  Object o -> prettyObject o
-  Array a -> prettyArray a
-  String s -> prettyString s
-  Number n -> prettyNumber n
-  Bool b -> bool "false" "true" b
-  Null -> "null"
+data Layout = OneLine | MultiLine
 
-prettyObject :: Object -> Doc a
-prettyObject = render . Map.toList
+prettyValue :: Layout -> Value -> Doc a
+prettyValue layout = \case
+  Object o -> prettyObject layout o
+  Array a  -> prettyArray layout a
+  String s -> prettyString layout s
+  Number n -> prettyNumber layout n
+  Bool b   -> bool "false" "true" b
+  Null     -> "null"
+
+prettyObject :: Layout -> Object -> Doc a
+prettyObject layout = render . Map.toList
   where
     render kvps
-        | null kvps = "{}"
-        | otherwise = encloseSep
-                          (flatAlt "" "{ ")
-                          (flatAlt "" " }")
-                          (flatAlt "" ", ")
-                          (fmap renderKeyValuePair kvps)
-    renderKeyValuePair (k, v) = pretty k <> ":" <+> group (nest 2 (flatAlt line "" <> prettyValue v))
+        | null kvps         = "{}"
+        | OneLine <- layout = oneLineObject kvps
+        | otherwise         = flatAlt (multiLineObject kvps) (oneLineObject kvps)
+    oneLineObject kvps = "{" <+> mconcat (intersperse ", " (fmap (renderKeyValuePair OneLine) kvps)) <+> "}"
+    multiLineObject kvps = mconcat (intersperse hardline (fmap (group . renderKeyValuePair MultiLine) kvps))
+    renderKeyValuePair l (k, v) = pretty k <> ":" <+> nest 2 (flatAlt line "" <> prettyValue l v)
 
-prettyArray :: Array -> Doc a
-prettyArray = render . Vector.toList
+prettyArray :: Layout -> Array -> Doc a
+prettyArray layout = render . Vector.toList
   where
     render vs
-        | null vs   = "[]"
-        | otherwise = encloseSep
-                          (flatAlt "- " "[ ")
-                          (flatAlt ""   " ]")
-                          (flatAlt "- " ", ")
-                          (fmap (group . nest 2 . prettyValue) vs)
+        | null vs           = "[]"
+        | OneLine <- layout = oneLineArray vs
+        | otherwise         = flatAlt (multiLineArray vs) (oneLineArray vs)
+    oneLineArray vs = "[" <+> mconcat (intersperse ", " (fmap (prettyValue OneLine) vs)) <+> "]"
+    multiLineArray vs = "-" <+> mconcat (intersperse (hardline <> "- ") (fmap (group . nest 2 . prettyValue MultiLine) vs))
 
 
-prettyString :: Text -> Doc a
-prettyString s
+prettyString :: Layout -> Text -> Doc a
+prettyString layout s
     | Text.null s           = "\"\""
     | mustBeTagged s        = "! '" <> pretty (Text.replace "'" "''" s) <> "'"
-    | mustBeQuoted s        = "\"" <> pretty (escape s) <> "\""
-    | otherwise             = flatAlt ("\"" <> reflow (escape s) <> "\"") (pretty s)
+    | OneLine <- layout     = "\"" <> pretty (escape s) <> "\""
+    | mustBeQuoted s        = "\"" <> reflow (escape s) <> "\""
+    | otherwise             = flatAlt ("\"" <> reflow (escape s) <> "\"")
+                                      (pretty s)
   where
     softQuote = flatAlt "\"" ""
     mustBeTagged s = Text.head s `elem` ("" :: [Char])
@@ -83,7 +85,7 @@ prettyString s
                 | Text.length spaces == 1 -> pretty word <> softline      <> reflow t''
                 | otherwise               -> pretty word <> pretty spaces <> reflow t''
 
-prettyNumber :: Scientific -> Doc a
+prettyNumber :: Layout -> Scientific -> Doc a
 prettyNumber = undefined
 
 encloseSep :: Doc a -> Doc a -> Doc a -> [Doc a] -> Doc a

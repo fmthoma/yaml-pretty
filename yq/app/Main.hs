@@ -23,12 +23,12 @@ syntaxHighlighting :: SimpleDocStream Tag -> SimpleDocStream AnsiStyle
 syntaxHighlighting = reAnnotateS ansiColors
   where
     ansiColors = \case
-        Syntax  -> colorDull Green
-        StringV -> color Green <> bold
-        NumberV -> colorDull Cyan
-        BoolV   -> colorDull White
-        NullV   -> colorDull Red
-        Key     -> colorDull Blue
+        Syntax  -> mempty
+        StringV -> colorDull Green
+        NumberV -> colorDull Magenta
+        BoolV   -> colorDull Red
+        NullV   -> colorDull Cyan
+        Key     -> colorDull Blue <> bold
 
 putDocS :: SimpleDocStream AnsiStyle -> IO ()
 putDocS = Text.putStrLn . renderStrict

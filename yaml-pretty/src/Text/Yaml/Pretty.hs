@@ -42,7 +42,7 @@ prettyObject layout = render . Map.toList
         | otherwise         = flatAlt (multiLineObject kvps) (oneLineObject kvps)
     oneLineObject kvps = curlyBraces (commaSep (fmap (renderKeyValuePair OneLine) kvps))
     multiLineObject kvps = lineSep (fmap (group . renderKeyValuePair MultiLine) kvps)
-    renderKeyValuePair l (k, v) = renderKey k <> syntax ":" <+> nest 2 (line <> prettyValue l v)
+    renderKeyValuePair l (k, v) = renderKey k <> syntax ":" <> nest 2 (line <> prettyValue l v)
     renderKey k
         | Text.null k        = quoted mempty
         | mustBeQuotedKey k  = quoted (key (escape k))

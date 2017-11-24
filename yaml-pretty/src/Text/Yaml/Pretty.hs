@@ -13,6 +13,7 @@ import           Data.Scientific                (FPFormat (..), Scientific,
                                                  formatScientific)
 import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
+import           Data.Text.Encoding             (decodeUtf8)
 import           Data.Text.Prettyprint.Doc      hiding (encloseSep)
 import           Data.Text.Prettyprint.Doc.Util (reflow)
 import qualified Data.Vector                    as Vector
@@ -99,7 +100,7 @@ isBooleanish s = s `elem`
     , "off", "Off", "OFF" ]
 
 prettyNumber :: Layout -> Scientific -> Doc Tag
-prettyNumber _ = annotate NumberV . pretty . formatScientific Generic Nothing
+prettyNumber _ = annotate NumberV . pretty . Text.takeWhile (/= '\n') . decodeUtf8 . encode
 
 encloseSep :: Doc Tag -> Doc Tag -> Doc Tag -> [Doc Tag] -> Doc Tag
 encloseSep left right sep docs = left <> mconcat (intersperse (line' <> sep) docs) <> right
